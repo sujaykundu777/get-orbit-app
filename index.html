@@ -29,6 +29,7 @@ body{margin:0;background:#F4F6F8}
 a{color:#2C47D4}a:hover{color:#1E33A8}
 .dl:hover{transform:translateY(-1px)}
 .dl:focus-visible,.navlink:focus-visible{outline:3px solid #8EA2FF;outline-offset:3px}
+[tabindex="-1"]:focus{outline:none}
 @media (max-width: 860px){.hero-grid{flex-direction:column !important}.hero-copy h1{font-size:44px !important}.section-h2{font-size:34px !important}}
 </style>
 </helmet>
@@ -36,10 +37,10 @@ a{color:#2C47D4}a:hover{color:#1E33A8}
 
 <!-- HERO -->
 <header style="position: relative; overflow: hidden; background: #0B1230; color: #FFFFFF">
-  <div aria-hidden="true" style="position: absolute; width: 900px; height: 900px; right: -260px; top: -220px; border-radius: 50%; border: 1px solid rgba(142,162,255,0.18)"></div>
-  <div aria-hidden="true" style="position: absolute; width: 640px; height: 640px; right: -130px; top: -90px; border-radius: 50%; border: 1px solid rgba(142,162,255,0.26)"></div>
-  <div aria-hidden="true" style="position: absolute; width: 18px; height: 18px; right: 470px; top: 150px; border-radius: 50%; background: #8EA2FF"></div>
-  <div aria-hidden="true" style="position: absolute; width: 10px; height: 10px; right: 120px; top: 560px; border-radius: 50%; background: #45C98C"></div>
+  <div aria-hidden="true" data-ring="outer" style="position: absolute; width: 900px; height: 900px; right: -260px; top: -220px; border-radius: 50%; border: 1px solid rgba(142,162,255,0.18)"></div>
+  <div aria-hidden="true" data-ring="inner" style="position: absolute; width: 640px; height: 640px; right: -130px; top: -90px; border-radius: 50%; border: 1px solid rgba(142,162,255,0.26)"></div>
+  <div aria-hidden="true" data-moon="inner" style="position: absolute; width: 18px; height: 18px; right: 470px; top: 150px; border-radius: 50%; background: #8EA2FF; box-shadow: 0 0 22px rgba(142,162,255,0.55); will-change: transform"></div>
+  <div aria-hidden="true" data-moon="outer" style="position: absolute; width: 10px; height: 10px; right: 120px; top: 560px; border-radius: 50%; background: #45C98C; box-shadow: 0 0 16px rgba(69,201,140,0.55); will-change: transform"></div>
 
   <nav style="position: relative; max-width: 1200px; margin: 0 auto; padding: 24px 24px 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap">
     <a href="#top" class="navlink" style="display: flex; align-items: center; gap: 10px; color: #FFFFFF; text-decoration: none; font-family: 'Bricolage Grotesque', Georgia, sans-serif; font-weight: 700; font-size: 24px">
@@ -213,6 +214,146 @@ class Component extends DCLogic {
     };
   }
 }
+</script>
+<!-- Smooth, unhurried scrolling for in-page links (#features, #how, #download, #top) -->
+<script>
+(function () {
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  var frame = null;
+
+  // Gentle ease-in-out: starts softly, glides, settles softly.
+  function ease(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+
+  function stop() {
+    if (frame) cancelAnimationFrame(frame);
+    frame = null;
+  }
+
+  function scrollToY(targetY, done) {
+    stop();
+    var startY = window.pageYOffset;
+    var distance = targetY - startY;
+    if (Math.abs(distance) < 2 || reduceMotion.matches) { window.scrollTo(0, targetY); done(); return; }
+    // Slow and steady: about 1s for short hops, up to 1.8s for long ones.
+    var duration = Math.min(1800, Math.max(1000, Math.abs(distance) * 0.6));
+    var start = null;
+    function step(now) {
+      if (start === null) start = now;
+      var t = Math.min(1, (now - start) / duration);
+      window.scrollTo(0, startY + distance * ease(t));
+      if (t < 1) frame = requestAnimationFrame(step); else { frame = null; done(); }
+    }
+    frame = requestAnimationFrame(step);
+  }
+
+  // If the visitor scrolls or touches mid-animation, hand control back to them.
+  ['wheel', 'touchstart', 'keydown'].forEach(function (type) {
+    window.addEventListener(type, stop, { passive: true });
+  });
+
+  // Delegated, because the page content is rendered after this script loads.
+  document.addEventListener('click', function (e) {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    var link = e.target.closest && e.target.closest('a[href^="#"]');
+    if (!link) return;
+    var id = decodeURIComponent(link.getAttribute('href').slice(1));
+    var target = id ? document.getElementById(id) : null;
+    if (!target) return;
+    e.preventDefault();
+    var y = id === 'top' ? 0 : target.getBoundingClientRect().top + window.pageYOffset;
+    // Sections near the bottom can't reach the top of the screen; ease to the page end instead of stopping short.
+    var maxY = document.documentElement.scrollHeight - window.innerHeight;
+    scrollToY(Math.max(0, Math.min(y, maxY)), function () {
+      if (history.pushState) history.pushState(null, '', '#' + id);
+      // Move keyboard focus to the section so Tab continues from there.
+      if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '-1');
+      target.focus({ preventScroll: true });
+    });
+  });
+})();
+</script>
+<!-- Hero orbits: the two moons ride the rings as you scroll (forward going down, backward going up) -->
+<script>
+(function () {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  // Degrees travelled per pixel scrolled. Inner moon is faster, like a closer orbit.
+  // Signs pick the direction that sweeps each moon through the visible part of the hero
+  // (down and around behind the phone) as you scroll down; scrolling up plays it backward.
+  var ORBITS = { inner: { speed: -0.16 }, outer: { speed: 0.09 } };
+  var shown = window.pageYOffset;   // eased scroll value that drives the animation
+  var frame = null;
+
+  function setup() {
+    var ok = true;
+    Object.keys(ORBITS).forEach(function (k) {
+      var o = ORBITS[k];
+      o.ring = document.querySelector('[data-ring="' + k + '"]');
+      o.moon = document.querySelector('[data-moon="' + k + '"]');
+      // Not drawn yet, or drawn but not laid out yet (zero size): try again shortly.
+      if (!o.ring || !o.moon || !o.ring.offsetWidth) { o.moon = null; ok = false; return; }
+      o.moon.style.transform = '';
+      // Where the moon sits in the design, relative to the ring's centre.
+      var cx = o.ring.offsetLeft + o.ring.offsetWidth / 2, cy = o.ring.offsetTop + o.ring.offsetHeight / 2;
+      var mx = o.moon.offsetLeft + o.moon.offsetWidth / 2, my = o.moon.offsetTop + o.moon.offsetHeight / 2;
+      o.cx = cx; o.cy = cy; o.mx = mx; o.my = my;
+      o.r = o.ring.offsetWidth / 2;                 // ride exactly on the ring
+      o.start = Math.atan2(my - cy, mx - cx);       // keep the designed starting angle
+    });
+    return ok;
+  }
+
+  function place(scroll) {
+    Object.keys(ORBITS).forEach(function (k) {
+      var o = ORBITS[k];
+      if (!o.moon) return;
+      var a = o.start + (scroll * o.speed) * Math.PI / 180;
+      var x = o.cx + o.r * Math.cos(a) - o.mx;
+      var y = o.cy + o.r * Math.sin(a) - o.my;
+      o.moon.style.transform = 'translate3d(' + x.toFixed(2) + 'px,' + y.toFixed(2) + 'px,0)';
+    });
+  }
+
+  // (Re)attach to the current hero elements. The page can redraw the hero after load,
+  // which swaps the elements out, so check before every frame and after every redraw.
+  function ensure() {
+    var stale = Object.keys(ORBITS).some(function (k) {
+      var o = ORBITS[k];
+      return !o.moon || !o.moon.isConnected || o.moon.style.transform === '';
+    });
+    if (!stale) return;
+    if (setup()) place(shown);
+    else if (tries++ < 300) requestAnimationFrame(ensure);   // keep checking for ~5s while the page settles
+  }
+  var tries = 0;
+
+  function tick() {
+    ensure();
+    var target = window.pageYOffset;
+    shown += (target - shown) * 0.08;               // soft follow: glides and settles after you stop
+    if (Math.abs(target - shown) < 0.3) shown = target;
+    place(shown);
+    frame = shown === target ? null : requestAnimationFrame(tick);
+  }
+
+  function kick() { if (!frame) frame = requestAnimationFrame(tick); }
+
+  function refresh() { if (setup()) place(shown); }
+
+  window.addEventListener('scroll', kick, { passive: true });
+  window.addEventListener('resize', refresh);
+  window.addEventListener('load', refresh);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(refresh);
+
+  // Watch for the page drawing (or redrawing) the hero, batched to one check per frame.
+  var pending = false;
+  new MutationObserver(function () {
+    if (pending) return;
+    pending = true;
+    requestAnimationFrame(function () { pending = false; ensure(); });
+  }).observe(document.documentElement, { childList: true, subtree: true });   // the page swaps in a new <body> when it renders
+  ensure();
+})();
 </script>
 </body>
 </html>
