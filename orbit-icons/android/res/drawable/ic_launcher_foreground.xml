@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Orbit mark on a 108dp adaptive-icon canvas. Everything sits inside the central 66dp safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <group android:rotation="-24" android:pivotX="54" android:pivotY="54">
+        <path android:strokeColor="#FFFFFFFF" android:strokeWidth="4" android:fillColor="#00000000"
+            android:pathData="M26.5,54 a27.5,15.5 0 1,0 55,0 a27.5,15.5 0 1,0 -55,0 Z" />
+    </group>
+    <path android:fillColor="#FFFFFFFF" android:pathData="M43.5,54 a10.5,10.5 0 1,0 21,0 a10.5,10.5 0 1,0 -21,0 Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M71.5,43.0 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0 Z" />
+</vector>
