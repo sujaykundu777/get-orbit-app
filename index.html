@@ -30,7 +30,7 @@ a{color:#2C47D4}a:hover{color:#1E33A8}
 .dl:hover{transform:translateY(-1px)}
 .dl:focus-visible,.navlink:focus-visible{outline:3px solid #8EA2FF;outline-offset:3px}
 [tabindex="-1"]:focus{outline:none}
-@media (max-width: 860px){.hero-grid{flex-direction:column !important}.hero-copy h1{font-size:44px !important}.section-h2{font-size:34px !important}}
+@media (max-width: 860px){.hero-grid{flex-direction:column !important}.hero-copy h1{font-size:44px !important}.section-h2{font-size:34px !important}[data-ring="outer"]{top:-390px !important}[data-ring="inner"]{top:-260px !important}[data-planet]{top:90px !important}}
 </style>
 </helmet>
 <div style="font-family: Figtree, 'Segoe UI', system-ui, sans-serif; color: #16212A; background: #F4F6F8; min-width: 0">
@@ -41,6 +41,22 @@ a{color:#2C47D4}a:hover{color:#1E33A8}
   <div aria-hidden="true" data-ring="inner" style="position: absolute; width: 640px; height: 640px; right: -130px; top: -90px; border-radius: 50%; border: 1px solid rgba(142,162,255,0.26)"></div>
   <div aria-hidden="true" data-moon="inner" style="position: absolute; width: 18px; height: 18px; right: 470px; top: 150px; border-radius: 50%; background: #8EA2FF; box-shadow: 0 0 22px rgba(142,162,255,0.55); will-change: transform"></div>
   <div aria-hidden="true" data-moon="outer" style="position: absolute; width: 10px; height: 10px; right: 120px; top: 560px; border-radius: 50%; background: #45C98C; box-shadow: 0 0 16px rgba(69,201,140,0.55); will-change: transform"></div>
+
+  <!-- Planet sphere — centred on shared ring centre (right:190, top:230) -->
+  <div aria-hidden="true" data-planet style="position: absolute; right: 150px; top: 190px; width: 80px; height: 80px; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 1px rgba(162,182,255,0.22), 0 0 22px rgba(100,130,255,0.7), 0 0 52px rgba(90,120,248,0.3), 0 0 90px rgba(142,162,255,0.16); will-change: transform">
+    <!-- Spinning surface: 520px wide so scroll never hits the edge at any realistic page height -->
+    <div data-planet-spin style="position: absolute; top: 0; left: 0; width: 520px; height: 80px; will-change: transform; background-image:
+      radial-gradient(ellipse 100% 30% at 50% 0%,   rgba(200,218,255,0.28) 0%, transparent 100%),
+      radial-gradient(ellipse 100% 24% at 50% 100%, rgba(180,205,255,0.22) 0%, transparent 100%),
+      radial-gradient(ellipse 7% 13% at 26% 46%,    rgba(210,225,255,0.36) 0%, transparent 100%),
+      radial-gradient(ellipse 5% 9%  at 68% 60%,    rgba(195,212,255,0.28) 0%, transparent 100%),
+      radial-gradient(ellipse 4% 7%  at 48% 30%,    rgba(220,232,255,0.22) 0%, transparent 100%),
+      repeating-linear-gradient(-18deg, transparent 0px, transparent 5px, rgba(162,182,255,0.07) 5px, rgba(162,182,255,0.07) 7px, transparent 7px, transparent 13px),
+      linear-gradient(180deg, #1E3A8A 0%, #2E54C0 10%, #3D68E0 18%, #5080F2 26%, #4A72E8 34%, #365AC8 42%, #2A4AB0 50%, #3460D0 58%, #4678E8 66%, #3868E0 74%, #2950C4 82%, #1E3C90 92%, #192E78 100%);
+      background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 13px 100%, 100% 100%"></div>
+    <!-- 3-D depth: lit from upper-left, shadow falls lower-right -->
+    <div style="position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle at 32% 30%, rgba(255,255,255,0.09) 0%, transparent 38%, rgba(0,0,0,0.6) 100%); pointer-events: none"></div>
+  </div>
 
   <nav style="position: relative; max-width: 1200px; margin: 0 auto; padding: 24px 24px 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap">
     <a href="#top" class="navlink" style="display: flex; align-items: center; gap: 10px; color: #FFFFFF; text-decoration: none; font-family: 'Bricolage Grotesque', Georgia, sans-serif; font-weight: 700; font-size: 24px">
@@ -353,6 +369,33 @@ class Component extends DCLogic {
     requestAnimationFrame(function () { pending = false; ensure(); });
   }).observe(document.documentElement, { childList: true, subtree: true });   // the page swaps in a new <body> when it renders
   ensure();
+})();
+</script>
+<!-- Planet axis rotation: surface translates horizontally as you scroll, giving a spin-on-axis illusion -->
+<script>
+(function () {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var spin = null;
+  var SPEED = 0.065; // px of surface shift per px scrolled
+
+  function getSpin() {
+    if (!spin || !spin.isConnected) spin = document.querySelector('[data-planet-spin]');
+    return spin;
+  }
+
+  function update() {
+    var el = getSpin();
+    if (!el) return;
+    // Negative shift moves surface leftward → planet appears to rotate clockwise (east to west)
+    el.style.transform = 'translateX(' + (-(window.pageYOffset * SPEED)).toFixed(2) + 'px)';
+  }
+
+  window.addEventListener('scroll', update, { passive: true });
+  window.addEventListener('load', update);
+  // Re-bind if the page re-renders the hero (x-dc framework swaps elements)
+  new MutationObserver(function () { spin = null; update(); })
+    .observe(document.documentElement, { childList: true, subtree: true });
+  update();
 })();
 </script>
 </body>
